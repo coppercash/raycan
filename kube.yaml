@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: raycan
+  name: raycan
+spec:
+  containers:
+  - image: docker.io/coppercash/raycan:latest
+    name: raycan
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_RAW
+    volumeMounts:
+    - mountPath: /etc/xray
+      name: xray_config
+      readOnly: true
+    - mountPath: /var/log/xray
+      name: xray_log
+  volumes:
+  - hostPath:
+      path: ./volumes/etc/xray
+      type: Directory
+    name: xray_config
+  - hostPath:
+      path: ./volumes/var/log/xray
+      type: DirectoryOrCreate
+    name: xray_log
