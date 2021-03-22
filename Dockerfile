@@ -1,9 +1,9 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
-ARG XRAY_FILE="/usr/local/bin/xray" \
-    XRAY_DATA_DIR="/usr/local/share/xray" \
-    ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
+ARG XRAY_FILE="/usr/local/bin/xray"
+ARG XRAY_DATA_DIR="/usr/local/share/xray"
+ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
 
 WORKDIR "/root"
 
@@ -12,7 +12,7 @@ COPY "./entrypoint.sh" $ENTRYPOINT_FILE
 RUN chmod +x $ENTRYPOINT_FILE \
  && microdnf \
         --refresh \
-        install iptables \
+        install iptables iproute \
  && microdnf \
         clean all \
  && curl --location \
@@ -28,4 +28,5 @@ RUN chmod +x $ENTRYPOINT_FILE \
         --output $XRAY_DATA_DIR"/geoip.dat"
 
 VOLUME "/etc/xray"
-ENTRYPOINT $ENTRYPOINT_FILE
+ENTRYPOINT "/usr/local/bin/entrypoint.sh"
+# Don't know how to use variable with ENTRYPOINT.
