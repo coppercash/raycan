@@ -2,7 +2,7 @@ POD = raycan
 RUNNER := $(if $(shell command -v podman),podman,docker)
 
 latest:
-	${RUNNER} build --tag ${POD}:latest .
+	${RUNNER} build --tag will/${POD}:latest .
 
 interactive:
 	${RUNNER} run \

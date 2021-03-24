@@ -1,7 +1,5 @@
-log:
-  access: /var/log/raycan/access.log
-  error: /var/log/raycan/error.log
-  loglevel: warning
 outbounds:
 - tag: direct
   protocol: freedom
+- tag: block
+  protocol: blackhole
