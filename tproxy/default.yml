@@ -1,0 +1,102 @@
+inbounds:
+- tag: transparent
+  port: 5100
+  protocol: dokodemo-door
+  settings:
+    network: tcp,udp
+    followRedirect: true
+  sniffing:
+    enabled: true
+    destOverride:
+    - http
+    - tls
+  streamSettings:
+    sockopt:
+      tproxy: tproxy
+outbounds:
+- tag: direct
+  protocol: freedom
+  settings:
+    domainStrategy: UseIP
+- tag: block
+  protocol: blackhole
+  settings:
+    response:
+      type: http
+- tag: dns-out
+  protocol: dns
+dns:
+  servers:
+  - 8.8.8.8  # Google's for domains outside GFW
+  - 1.1.1.1  # Cloudfare's for domains outside GFW
+  - 114.114.114.114  # 114 as backup
+  - address: 223.5.5.5  # Alibaba's for domains inside GFW
+    port: 53
+    domains:
+    - geosite:cn
+    - ntp.org
+routing:
+  domainStrategy: IPOnDemand
+  rules:
+
+  - type: field
+    network: udp
+    port: 53
+    outboundTag: dns-out
+    inboundTag:
+    - transparent
+  # DNS traffic via service offerred by v2ray
+  
+  - type: field
+    network: udp
+    port: 123
+    outboundTag: direct
+    inboundTag:
+    - transparent
+    # NTP traffic out directly
+    
+  - type: field
+    outboundTag: direct
+    ip:
+    - 223.5.5.5
+    - 114.114.114.114
+    # DNS
+
+  - type: field
+    outboundTag: proxy
+    ip:
+    - 8.8.8.8
+    - 1.1.1.1
+    # DNS
+
+  - type: field
+    outboundTag: proxy
+    ip:
+    - 8.8.8.8
+    - 1.1.1.1
+    # DNS
+
+  - type: field
+    outboundTag: block
+    domain:
+    - geosite:category-ads-all
+    # Block commercial
+
+  - type: field
+    outboundTag: direct
+    protocol:
+    - bittorrent
+    # BT traffic
+
+  - type: field
+    outboundTag: direct
+    ip:
+    - geoip:private
+    - geoip:cn
+    # Private IP & IP inside GFW
+
+  - type: field
+    outboundTag: direct
+    domain:
+    - geosite:cn
+    # Domains inside GFW
