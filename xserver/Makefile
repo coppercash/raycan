@@ -1,30 +1,52 @@
-APP = raycan
-POD = xserver
+CONTAINER = xserver
 RUNNER := $(if $(shell command -v podman),podman,docker)
 
 latest:
-	${RUNNER} build --tag will/${POD}:latest .
+	${RUNNER} build --tag will/raycan/${CONTAINER}:latest .
 
-interactive:
+it:
 	${RUNNER} run \
-		--hostname ${POD} \
-		-v $(CURDIR)/volumes/etc/${APP}:/etc/${APP}:ro \
-		-v $(CURDIR)/volumes/var/log/${APP}:/var/log/${APP} \
+		--hostname ${CONTAINER} \
 		-it \
 		--rm \
-		--name ${POD} \
+		--name ${CONTAINER} \
 		--entrypoint ash \
-		${POD}:latest
+		-v $(CURDIR)/volumes/etc/raycan:/etc/raycan:ro \
+		-v $(CURDIR)/volumes/var/log/xray:/var/log/xray \
+		-v $(CURDIR)/volumes/var/html:/var/html \
+		-v $(CURDIR)/volumes/var/acmesh/cert:/var/acmesh/cert \
+		-v $(CURDIR)/volumes/var/log/acmesh:/var/log/acmesh \
+		-p 443:443 \
+		-p 80:80 \
+		-e SERVER_NAME=${SERVER_NAME} \
+		will/raycan/${CONTAINER}:latest
 
 run:
 	${RUNNER} run \
-		--hostname ${POD} \
-		-v $(CURDIR)/volumes/etc/${APP}:/etc/${APP}:ro \
-		-v $(CURDIR)/volumes/var/log/${APP}:/var/log/${APP} \
 		-d \
 		--rm \
-		--name ${POD} \
-		${POD}:latest
+		--name ${CONTAINER} \
+		-v $(CURDIR)/volumes/etc/raycan:/etc/raycan:ro \
+		-v $(CURDIR)/volumes/var/log/xray:/var/log/xray \
+		-v $(CURDIR)/volumes/var/html:/var/html \
+		-v $(CURDIR)/volumes/var/acmesh/cert:/var/acmesh/cert \
+		-v $(CURDIR)/volumes/var/log/acmesh:/var/log/acmesh \
+		-p 443:443 \
+		-p 80:80 \
+		-e SERVER_NAME=${SERVER_NAME} \
+		will/raycan/${CONTAINER}:latest
+
+staging:
+	${RUNNER} run \
+		--rm \
+		--name ${CONTAINER} \
+		-v $(CURDIR)/volumes/var/log/acmesh:/var/log/acmesh \
+		-v $(CURDIR)/volumes/var/html:/var/html \
+		-v $(CURDIR)/volumes/var/acmesh/cert:/var/acmesh/cert \
+		-p 443:443 \
+		-p 80:80 \
+		-e SERVER_NAME=${SERVER_NAME} \
+		will/raycan/${CONTAINER}:latest -t
 
 stop:
-	${RUNNER} stop ${POD}
+	${RUNNER} stop ${CONTAINER}

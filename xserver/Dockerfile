@@ -5,13 +5,37 @@ ARG YQ_FILE="/usr/local/bin/yq"
 ARG XRAY_FILE="/usr/local/bin/xray"
 ARG XRAY_DATA_DIR="/usr/local/share/xray"
 ARG XRAY_CFG_DIR="/etc/xray"
+ARG XRAY_EXT_CFG_DIR="/etc/xray/ext"
+ARG ACME_EXE="/usr/local/bin/acme.sh"
+ARG ACME_CRT_DIR="/var/acmesh/cert"
+ARG ACME_HOME_DIR="/usr/local/bin/acmesh"
+ARG ACME_CFG_DIR="/etc/acmesh"
 ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
 
 RUN apk add --update --no-cache \
         nginx \
+
+# Needed by acme.sh
+# wget doen't work for acme.sh, but curl does.
+# Guessing it is a bug.
         openssl \
- && wget -O -  https://get.acme.sh | sh \
- && ~/.acme.sh/acme.sh --upgrade --auto-upgrade \
+        git \
+        curl \
+
+ && mkdir -p "/tmp/acmesh" \
+ && cd "/tmp/acmesh" \
+ && git clone --depth 1 \
+        "https://github.com/acmesh-official/acme.sh.git" \
+        . \
+ && ./acme.sh --install  \
+        --home ${ACME_HOME_DIR} \
+        --config-home ${ACME_CFG_DIR} \
+        --cert-home ${ACME_CRT_DIR} \
+ && cd ~ \
+ && rm -r "/tmp/acmesh" \
+ && echo $'#!/bin/sh\n/usr/local/bin/acmesh/acme.sh "$@"' > ${ACME_EXE}  \
+ && chmod +x ${ACME_EXE} \
+# Function to retrieve download URL.
  && GET_DOWNLOAD_URL() { \
         wget -q -O - "https://api.github.com/repos/${1}/releases/latest" \
         | grep "browser_download_url" \
@@ -20,13 +44,13 @@ RUN apk add --update --no-cache \
         | cut -d `printf "\x22"` -f 4 \
         ; \
     } \
- # Install yq.
+# Install yq.
  && YQ_URL=$(GET_DOWNLOAD_URL "mikefarah/yq" "linux_amd64") \
  && echo "Downloading yq from ${YQ_URL} ..." \
  && wget ${YQ_URL} -O ${YQ_FILE} \
  && chmod +x ${YQ_FILE} \
  && echo "yq downloaded!" \
- # Install xray.
+# Install xray.
  && XRAY_URL=$(GET_DOWNLOAD_URL "xtls/xray-core" "linux-64") \
  && echo "Downloading xray from ${XRAY_URL} ..." \
  && wget ${XRAY_URL} -O "/tmp/xray.zip" \
@@ -41,11 +65,16 @@ RUN apk add --update --no-cache \
  && echo "xray downloaded!"
 
 COPY "./default.yml" "./entrypoint.sh" "/tmp/"
+# Entrypoint
 RUN mv "/tmp/entrypoint.sh" $ENTRYPOINT_FILE \
  && chmod +x $ENTRYPOINT_FILE \
+# XRay Default Config
  && mkdir -p ${XRAY_CFG_DIR} \
- && yq --tojson eval "/tmp/default.yml" > "/etc/xray/default.json" \
- && rm "/tmp/default.yml"
+ && mkdir -p ${XRAY_EXT_CFG_DIR} \
+ && yq --tojson eval "/tmp/default.yml" > "${XRAY_CFG_DIR}/default.json" \
+ && rm "/tmp/default.yml" \
+# nginx
+ && mkdir -p "/var/run/nginx"
 
 ENTRYPOINT "/usr/local/bin/entrypoint.sh"
 # Don't know how to use variable with ENTRYPOINT.
