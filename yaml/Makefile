@@ -1,29 +1,28 @@
-POD = raycan
+CONTAINER = yaml
 RUNNER := $(if $(shell command -v podman),podman,docker)
 
 latest:
-	${RUNNER} build --tag will/${POD}:latest .
+	${RUNNER} build --tag will/raycan/${CONTAINER}:latest .
 
-interactive:
+it:
 	${RUNNER} run \
-		--hostname ${POD} \
-		-v $(CURDIR)/volumes/etc/${POD}:/etc/${POD}:ro \
-		-v $(CURDIR)/volumes/var/log/${POD}:/var/log/${POD} \
+		--hostname ${CONTAINER} \
 		-it \
 		--rm \
-		--name ${POD} \
+		--name ${CONTAINER} \
 		--entrypoint ash \
-		${POD}:latest
+		-v $(CURDIR)/volumes/etc/raycan:/etc/raycan:ro \
+		-v $(CURDIR)/volumes/var/log/xray:/var/log/xray \
+		will/raycan/${CONTAINER}:latest
 
 run:
 	${RUNNER} run \
-		--hostname ${POD} \
-		-v $(CURDIR)/volumes/etc/${POD}:/etc/${POD}:ro \
-		-v $(CURDIR)/volumes/var/log/${POD}:/var/log/${POD} \
 		-d \
 		--rm \
-		--name ${POD} \
-		${POD}:latest
+		--name ${CONTAINER} \
+		-v $(CURDIR)/volumes/etc/raycan:/etc/raycan:ro \
+		-v $(CURDIR)/volumes/var/log/xray:/var/log/xray \
+		will/raycan/${CONTAINER}:latest
 
 stop:
-	${RUNNER} stop ${POD}
+	${RUNNER} stop ${CONTAINER}

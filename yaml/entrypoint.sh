@@ -1,14 +1,20 @@
 #!/bin/sh
 
-CFG_DIR="/etc/xray"
-EXT_CFG_DIR="${CFG_DIR}/ext"
+RAY_CFG_DIR="/etc/raycan" 
+XRAY_CFG_DIR="/etc/xray"
+XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
 
-mkdir -p ${EXT_CFG_DIR} \
-&& cd ${EXT_CFG_DIR} \
-&& find "/etc/raycan" \
-    -type f \( -iname \*.yaml -o -iname \*.yml \) \
-    -exec sh -c \
-        'yq --tojson eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
-&& cd ~
+function run_xray() {
+    mkdir -p ${XRAY_EXT_CFG_DIR} \
+    && cd ${XRAY_EXT_CFG_DIR} \
+    && find ${RAY_CFG_DIR} \
+        -type f \( -iname \*.yaml -o -iname \*.yml \) \
+        -exec sh -c \
+            'yq --tojson eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
+    && cd ~ \
+    && xray \
+        -config "${XRAY_CFG_DIR}/default.json" \
+        -confdir ${XRAY_EXT_CFG_DIR}
+}
 
-xray -config "${CFG_DIR}/default.json" -confdir ${EXT_CFG_DIR}
+run_xray
