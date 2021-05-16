@@ -19,6 +19,7 @@ IPADDR=$(ip address show dev eth0 scope global | awk '/inet / {split($2,var,"/")
 function run_xray() {
     mkdir -p ${XRAY_EXT_CFG_DIR} \
     && cd ${XRAY_EXT_CFG_DIR} \
+    && rm -rf ./* \
     && find ${RAY_CFG_DIR} \
         -type f \( -iname \*.yaml -o -iname \*.yml \) \
         -exec sh -c \
