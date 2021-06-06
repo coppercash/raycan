@@ -7,7 +7,7 @@ inbounds:
     security: xtls
     xtlsSettings:
       allowInsecure: false
-      minVersion: 1.2
+      minVersion: "1.2"
       alpn:
       - http/1.1
       certificates:
