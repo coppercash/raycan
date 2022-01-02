@@ -34,6 +34,9 @@ function setup_iptables() {
     echo "Setting up iptables with ip address '${IPADDR}' ..." \
      && iptables -t mangle -N RAY \
      && iptables -t mangle -A RAY \
+            -d 255.255.255.255/32 \
+            -j RETURN \
+     && iptables -t mangle -A RAY \
             -d ${IPADDR} \
             -j RETURN \
      && iptables -t mangle -A RAY \
