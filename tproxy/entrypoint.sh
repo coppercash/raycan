@@ -14,7 +14,19 @@ XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
 
 REROUTE_FW_MK=0x1
 RT_TABLE_NO=50
-IPADDR=$(ip address show dev eth0 scope global | awk '/inet / {split($2,var,"/"); print var[1]}')
+
+function ip_addr() {
+    ip address show dev eth0 scope global \
+        | grep "inet " \
+        | cut -d " " -f6 \
+        | cut -d "/" -f1
+}
+
+function brd_addr() {
+    ip address show dev eth0 scope global \
+        | grep "inet " \
+        | cut -d " " -f8
+}
 
 function run_xray() {
     mkdir -p ${XRAY_EXT_CFG_DIR} \
@@ -31,13 +43,16 @@ function run_xray() {
 }
 
 function setup_iptables() {
-    echo "Setting up iptables with ip address '${IPADDR}' ..." \
+    echo "Setting up iptables with ip address '`ip_addr`' broadcast address '`brd_addr`' ..." \
      && iptables -t mangle -N RAY \
      && iptables -t mangle -A RAY \
-            -d 255.255.255.255/32 \
+            -d 255.255.255.255 \
             -j RETURN \
      && iptables -t mangle -A RAY \
-            -d ${IPADDR} \
+            -d `brd_addr` \
+            -j RETURN \
+     && iptables -t mangle -A RAY \
+            -d `ip_addr` \
             -j RETURN \
      && iptables -t mangle -A RAY \
             -j TPROXY \
@@ -52,14 +67,14 @@ function setup_iptables() {
      && iptables -t mangle -A PREROUTING -j RAY
 }
 # Self-skipping
-# Packages targeting IPADDR are not t-proxied,
+# Packages targeting ip_addr are not t-proxied,
 # mainly the tproxy packages from the proxy server, via the host, targeting the container.
-# Given that only packages target IPADDR are routed into the container,
+# Given that only packages target ip_addr are routed into the container,
 # we don't setup other rules to filter out
 # packages target other addresses in LAN.
 #
 # UDP
-# UDP packages not targeting IPADDR are t-proxied
+# UDP packages not targeting ip_addr are t-proxied
 # via Ray listening on RAY_PORT
 # and are marked with REROUTE_FW_MK.
 #
