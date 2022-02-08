@@ -49,6 +49,9 @@ function setup_iptables() {
             -d 255.255.255.255 \
             -j RETURN \
      && iptables -t mangle -A RAY \
+            -d 224.0.0.0/24 \
+            -j RETURN \
+     && iptables -t mangle -A RAY \
             -d `brd_addr` \
             -j RETURN \
      && iptables -t mangle -A RAY \
