@@ -62,7 +62,7 @@ function run_xray() {
     && find ${RAY_CFG_DIR} \
         -type f \( -iname \*.yaml -o -iname \*.yml \) \
         -exec sh -c \
-            'yq --tojson eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
+            'yq -o=json eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
     && cd ~ \
     && xray \
         -config "${XRAY_CFG_DIR}/default.json" \

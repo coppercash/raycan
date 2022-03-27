@@ -71,7 +71,7 @@ RUN mv "/tmp/entrypoint.sh" $ENTRYPOINT_FILE \
 # XRay Default Config
  && mkdir -p ${XRAY_CFG_DIR} \
  && mkdir -p ${XRAY_EXT_CFG_DIR} \
- && yq --tojson eval "/tmp/default.yml" > "${XRAY_CFG_DIR}/default.json" \
+ && yq -o=json eval "/tmp/default.yml" > "${XRAY_CFG_DIR}/default.json" \
  && rm "/tmp/default.yml" \
 # nginx
  && mkdir -p "/var/run/nginx"

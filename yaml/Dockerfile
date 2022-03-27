@@ -1,4 +1,4 @@
-FROM alpine:3.13
+FROM alpine:3.15
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
 ARG YQ_FILE="/usr/local/bin/yq"
@@ -39,7 +39,7 @@ COPY "./default.yml" "./entrypoint.sh" "/tmp/"
 RUN mv "/tmp/entrypoint.sh" $ENTRYPOINT_FILE \
  && chmod +x $ENTRYPOINT_FILE \
  && mkdir -p ${XRAY_CFG_DIR} \
- && yq --tojson eval "/tmp/default.yml" > "/etc/xray/default.json" \
+ && yq -o=json eval "/tmp/default.yml" > "/etc/xray/default.json" \
  && rm "/tmp/default.yml"
 
 ENTRYPOINT "/usr/local/bin/entrypoint.sh"
