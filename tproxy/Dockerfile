@@ -10,7 +10,7 @@ ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
 
 RUN microdnf \
         --refresh install \
-        iptables iproute unzip findutils \
+        iptables iproute iputils unzip findutils \
  && microdnf \
         clean all \
 # Function to retrieve download URL.
