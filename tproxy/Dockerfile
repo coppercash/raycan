@@ -3,10 +3,11 @@ LABEL maintainer="Will <coderdreamer@gmail.com>"
 
 ARG TMPDIR="/tmp/pod"
 
-RUN microdnf \
+RUN echo \
+ && microdnf \
         --assumeyes \
         --refresh install \
-        iptables ipset iproute iputils unzip findutils \
+        iptables iproute iputils unzip findutils \
  && microdnf \
         clean all \
  && mkdir -p "$TMPDIR" \
@@ -29,7 +30,8 @@ RUN microdnf \
         ; \
     } \
  && download "mikefarah/yq" "linux_amd64" "${TMPDIR}/yq" \
- && download "xtls/xray-core" "linux-64" "${TMPDIR}/xray.zip"
+ && download "xtls/xray-core" "linux-64" "${TMPDIR}/xray.zip" \
+ && echo
 
 COPY \
     "./default.yml" \
@@ -55,6 +57,7 @@ RUN echo \
  && yq -o=json eval "${TMPDIR}/default.yml" > "/etc/xray/default.json" \
  && rm "${TMPDIR}/default.yml" \
  && mkdir -p "/etc/xray/ext" \
+ && mkdir -p "/var/log/xray" \
 # Entrypoint
  && chmod +x "${TMPDIR}/entrypoint.sh" \
  && mv "${TMPDIR}/entrypoint.sh" "/usr/local/bin/entrypoint" \

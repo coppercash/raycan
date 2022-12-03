@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# TODO:
+# * merge setup_iptables & setup_ip6tables
+
 # Clients: the hosts or containers use TProxy as gateway.
 # TProxy: This container.
 # Ray: v2ray (or xray).
@@ -25,47 +28,43 @@ declare -r XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
 declare -r REROUTE_FW_MK=0x1
 declare -r RT_TABLE_NO=50
 
-function ip_addr() {
-    ip address show dev eth0 scope global \
-        | grep 'inet ' \
-        | cut -d ' ' -f6 \
-        | cut -d '/' -f1
-}
-
-function brd_addr() {
-    ip address show dev eth0 scope global \
-        | grep 'inet ' \
-        | cut -d ' ' -f8
+function convert_config() {
+    find /etc/raycan \
+        -type f \( -iname \*.yaml -o -iname \*.yml \) \
+        -exec sh -c \
+            'yq -o=json eval $0 > "/etc/xray/ext/$( basename $0 | cut -d. -f1 ).json"' {} \; \
+    && ls /etc/xray/ext
 }
 
 function run_xray() {
-    mkdir -p "$XRAY_EXT_CFG_DIR" \
-    && cd "$XRAY_EXT_CFG_DIR" \
-    && rm -rf ./* \
-    && find "$RAY_CFG_DIR" \
-        -type f \( -iname \*.yaml -o -iname \*.yml \) \
-        -exec sh -c \
-            'yq -o=json eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
-    && cd ~ \
-    && xray \
+    if [ -d "$RAY_CFG_DIR" ]; then
+        convert_config
+    fi
+    xray \
         -config "${XRAY_CFG_DIR}/default.json" \
         -confdir "$XRAY_EXT_CFG_DIR"
 }
 
+function get_ip_addr() {
+    ip address show dev eth0 \
+        | grep "${1} " \
+        | cut -d ' ' -f6 \
+        | cut -d '/' -f1
+}
+
 function setup_iptables() {
-    echo "Setting up iptables with ip address '`ip_addr`' broadcast address '`brd_addr`' ..." \
+    echo \
      && iptables -t mangle -N RAY \
      && iptables -t mangle -A RAY \
-            -d 255.255.255.255 \
+            -m pkttype \
+            --pkt-type broadcast \
             -j RETURN \
      && iptables -t mangle -A RAY \
-            -d 224.0.0.0/24 \
+            -m pkttype \
+            --pkt-type multicast \
             -j RETURN \
      && iptables -t mangle -A RAY \
-            -d `brd_addr` \
-            -j RETURN \
-     && iptables -t mangle -A RAY \
-            -d `ip_addr` \
+            -d "$( get_ip_addr 'inet' )" \
             -j RETURN \
      && iptables -t mangle -A RAY \
             -j TPROXY \
@@ -77,7 +76,8 @@ function setup_iptables() {
             -p tcp \
             --on-port "$RAY_PORT" \
             --tproxy-mark "$REROUTE_FW_MK" \
-     && iptables -t mangle -A PREROUTING -j RAY
+     && iptables -t mangle -A PREROUTING -j RAY \
+     && iptables -nvL RAY -t mangle
 }
 # Self-skipping
 # Packages targeting ip_addr are not t-proxied,
@@ -94,15 +94,45 @@ function setup_iptables() {
 # TCP
 # Same with the previous but for TCP.
 
+function setup_ip6tables() {
+    echo \
+     && ip6tables -t mangle -N RAY \
+     && ip6tables -t mangle -A RAY \
+            -m pkttype \
+            --pkt-type broadcast \
+            -j RETURN \
+     && ip6tables -t mangle -A RAY \
+            -m pkttype \
+            --pkt-type multicast \
+            -j RETURN \
+     && ip6tables -t mangle -A RAY \
+            -d "$( get_ip_addr 'inet6' )" \
+            -j RETURN \
+     && ip6tables -t mangle -A RAY \
+            -j TPROXY \
+            -p udp \
+            --on-port "$RAY_PORT" \
+            --tproxy-mark "$REROUTE_FW_MK" \
+     && ip6tables -t mangle -A RAY \
+            -j TPROXY \
+            -p tcp \
+            --on-port "$RAY_PORT" \
+            --tproxy-mark "$REROUTE_FW_MK" \
+     && ip6tables -t mangle -A PREROUTING -j RAY \
+     && ip6tables -nvL RAY -t mangle
+}
+
 function setup_routing() {
-    echo "Setting up routing ..." \
+    echo \
      && ip rule add \
             fwmark "$REROUTE_FW_MK" \
             lookup "$RT_TABLE_NO" \
      && ip route add \
             local default \
             dev lo \
-            table "$RT_TABLE_NO"
+            table "$RT_TABLE_NO" \
+     && ip rule \
+     && ip route show table "$RT_TABLE_NO"
 }
 # Rule
 # All packages marked REROUTE_FW_MK by firewall
@@ -113,4 +143,4 @@ function setup_routing() {
 # get re-routed to device local.
 # If not re-routed, the packages cannot be received by Ray.
 
-setup_iptables && setup_routing && run_xray
+setup_iptables && setup_ip6tables && setup_routing && run_xray
