@@ -45,11 +45,14 @@ function run_xray() {
         -confdir "$XRAY_EXT_CFG_DIR"
 }
 
-function get_ip_addr() {
-    ip address show dev eth0 \
-        | grep "${1} " \
+function get_ip_addrs() {
+    local -r family=$1
+    local -r dev=eth0
+    ip -"$family" address show dev "$dev" \
+        | grep 'inet' \
         | cut -d ' ' -f6 \
-        | cut -d '/' -f1
+        | cut -d '/' -f1 \
+        | paste -s -d','
 }
 
 function setup_iptables() {
@@ -64,7 +67,7 @@ function setup_iptables() {
             --pkt-type multicast \
             -j RETURN \
      && iptables -t mangle -A RAY \
-            -d "$( get_ip_addr 'inet' )" \
+            -d "$( get_ip_addrs '4' )" \
             -j RETURN \
      && iptables -t mangle -A RAY \
             -j TPROXY \
@@ -106,7 +109,7 @@ function setup_ip6tables() {
             --pkt-type multicast \
             -j RETURN \
      && ip6tables -t mangle -A RAY \
-            -d "$( get_ip_addr 'inet6' )" \
+            -d "$( get_ip_addrs '6' )" \
             -j RETURN \
      && ip6tables -t mangle -A RAY \
             -j TPROXY \
