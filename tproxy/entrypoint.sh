@@ -1,45 +1,55 @@
 #!/bin/sh
 
-# Host (route table main default via Container) ->
-# Container (iptables --tproxy-mark REROUTE_FW_MK) ->
-# Container (rule fwmark REROUTE_FW_MK dev lo) ->
-# Ray:RAY_PORT (streamSettings.sockopt.mark: OUTGOING_FW_MK) ->
-# Host (rule fwmark OUTGOING_FW_MK via Gateway) ->
+# Clients: the hosts or containers use TProxy as gateway.
+# TProxy: This container.
+# Ray: v2ray (or xray).
+# Host: The physical machine hosts this container.
+# Gateway: The gateway shared by TProxy and Host.
+#
+# Data Flow:
+# Clients (route table main default via TProxy) ->
+# TProxy (iptables --tproxy-mark REROUTE_FW_MK) ->
+# TProxy (ip rule fwmark REROUTE_FW_MK dev lo) ->
+# Ray:RAY_PORT
+# Gateway
 # Internet / Proxy Server
+#
+# Host is not involved in the entire data-flow.
+# Thus, it can use TProxy as gateway as well.
 
-RAY_CFG_DIR="/etc/raycan" 
-RAY_PORT=5100
-XRAY_CFG_DIR="/etc/xray"
-XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
+declare -r RAY_CFG_DIR='/etc/raycan' 
+declare -r RAY_PORT=5100
+declare -r XRAY_CFG_DIR='/etc/xray'
+declare -r XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
 
-REROUTE_FW_MK=0x1
-RT_TABLE_NO=50
+declare -r REROUTE_FW_MK=0x1
+declare -r RT_TABLE_NO=50
 
 function ip_addr() {
     ip address show dev eth0 scope global \
-        | grep "inet " \
-        | cut -d " " -f6 \
-        | cut -d "/" -f1
+        | grep 'inet ' \
+        | cut -d ' ' -f6 \
+        | cut -d '/' -f1
 }
 
 function brd_addr() {
     ip address show dev eth0 scope global \
-        | grep "inet " \
-        | cut -d " " -f8
+        | grep 'inet ' \
+        | cut -d ' ' -f8
 }
 
 function run_xray() {
-    mkdir -p ${XRAY_EXT_CFG_DIR} \
-    && cd ${XRAY_EXT_CFG_DIR} \
+    mkdir -p "$XRAY_EXT_CFG_DIR" \
+    && cd "$XRAY_EXT_CFG_DIR" \
     && rm -rf ./* \
-    && find ${RAY_CFG_DIR} \
+    && find "$RAY_CFG_DIR" \
         -type f \( -iname \*.yaml -o -iname \*.yml \) \
         -exec sh -c \
             'yq -o=json eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
     && cd ~ \
     && xray \
         -config "${XRAY_CFG_DIR}/default.json" \
-        -confdir ${XRAY_EXT_CFG_DIR}
+        -confdir "$XRAY_EXT_CFG_DIR"
 }
 
 function setup_iptables() {
@@ -60,21 +70,21 @@ function setup_iptables() {
      && iptables -t mangle -A RAY \
             -j TPROXY \
             -p udp \
-            --on-port ${RAY_PORT} \
-            --tproxy-mark ${REROUTE_FW_MK} \
+            --on-port "$RAY_PORT" \
+            --tproxy-mark "$REROUTE_FW_MK" \
      && iptables -t mangle -A RAY \
             -j TPROXY \
             -p tcp \
-            --on-port ${RAY_PORT} \
-            --tproxy-mark ${REROUTE_FW_MK} \
+            --on-port "$RAY_PORT" \
+            --tproxy-mark "$REROUTE_FW_MK" \
      && iptables -t mangle -A PREROUTING -j RAY
 }
 # Self-skipping
 # Packages targeting ip_addr are not t-proxied,
 # mainly the tproxy packages from the proxy server, via the host, targeting the container.
-# Given that only packages target ip_addr are routed into the container,
-# we don't setup other rules to filter out
-# packages target other addresses in LAN.
+# Given that only packages targeting ip_addr are routed into the container,
+# we don't need to setup other rules to filter out
+# packages targeting other addresses in LAN.
 #
 # UDP
 # UDP packages not targeting ip_addr are t-proxied
@@ -87,12 +97,12 @@ function setup_iptables() {
 function setup_routing() {
     echo "Setting up routing ..." \
      && ip rule add \
-            fwmark ${REROUTE_FW_MK} \
-            lookup ${RT_TABLE_NO} \
+            fwmark "$REROUTE_FW_MK" \
+            lookup "$RT_TABLE_NO" \
      && ip route add \
             local default \
             dev lo \
-            table ${RT_TABLE_NO}
+            table "$RT_TABLE_NO"
 }
 # Rule
 # All packages marked REROUTE_FW_MK by firewall
