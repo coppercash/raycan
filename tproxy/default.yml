@@ -36,11 +36,10 @@ dns:
     - geosite:cn
     - ntp.org
 routing:
-  domainStrategy: IPOnDemand
+  domainStrategy: AsIs
   rules:
 
   - type: field
-    network: udp
     port: 53
     outboundTag: dns-out
     inboundTag:
