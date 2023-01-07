@@ -1,7 +1,4 @@
-#!/bin/sh
-
-# TODO:
-# * merge setup_iptables & setup_ip6tables
+#!/usr/bin/env bash
 
 # Clients: the hosts or containers use TProxy as gateway.
 # TProxy: This container.
@@ -20,6 +17,8 @@
 # Host is not involved in the entire data-flow.
 # Thus, it can use TProxy as gateway as well.
 
+set -ux
+
 declare -r RAY_CFG_DIR='/etc/raycan' 
 declare -r RAY_PORT=5100
 declare -r XRAY_CFG_DIR='/etc/xray'
@@ -27,6 +26,8 @@ declare -r XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
 
 declare -r REROUTE_FW_MK=0x1
 declare -r RT_TABLE_NO=50
+
+declare -r CHAIN='RAY'
 
 function convert_config() {
     find /etc/raycan \
@@ -50,37 +51,60 @@ function get_ip_addrs() {
     local -r dev=eth0
     ip -"$family" address show dev "$dev" \
         | grep 'inet' \
-        | cut -d ' ' -f6 \
-        | cut -d '/' -f1 \
+        | cut -d' ' -f6 \
+        | cut -d'/' -f1 \
         | paste -s -d','
 }
 
+function get_iptables_command() {
+    local -r family=$1
+    case "$family" in 
+        4) echo 'iptables';;
+        6) echo 'ip6tables';;
+        *) echo ''
+    esac
+}
+
 function setup_iptables() {
+    local -r family=$1
+
+    local -r addrs=$(get_ip_addrs "$family")
+    if [ -z "$addrs" ]
+    then
+        return
+    fi
+
+    local -r iptables=$(get_iptables_command "$family")
+    if [ -z "$iptables" ]
+    then
+        return 1
+    fi
+
     echo \
-     && iptables -t mangle -N RAY \
-     && iptables -t mangle -A RAY \
+     && "$iptables" -t mangle -N "$CHAIN" \
+     && "$iptables" -t mangle -A "$CHAIN" \
             -m pkttype \
             --pkt-type broadcast \
             -j RETURN \
-     && iptables -t mangle -A RAY \
+     && "$iptables" -t mangle -A "$CHAIN" \
             -m pkttype \
             --pkt-type multicast \
             -j RETURN \
-     && iptables -t mangle -A RAY \
-            -d "$( get_ip_addrs '4' )" \
+     && "$iptables" -t mangle -A "$CHAIN" \
+            -d "$addrs" \
             -j RETURN \
-     && iptables -t mangle -A RAY \
+     && "$iptables" -t mangle -A "$CHAIN" \
             -j TPROXY \
             -p udp \
             --on-port "$RAY_PORT" \
             --tproxy-mark "$REROUTE_FW_MK" \
-     && iptables -t mangle -A RAY \
+     && "$iptables" -t mangle -A "$CHAIN" \
             -j TPROXY \
             -p tcp \
             --on-port "$RAY_PORT" \
             --tproxy-mark "$REROUTE_FW_MK" \
-     && iptables -t mangle -A PREROUTING -j RAY \
-     && iptables -nvL RAY -t mangle
+     && "$iptables" -t mangle -A PREROUTING -j "$CHAIN" \
+     && "$iptables" -nvL "$CHAIN" -t mangle
 }
 # Self-skipping
 # Packages targeting ip_addr are not t-proxied,
@@ -97,32 +121,28 @@ function setup_iptables() {
 # TCP
 # Same with the previous but for TCP.
 
-function setup_ip6tables() {
+function teardown_iptables() {
+    local -r family=$1
+
+    local -r iptables=$(get_iptables_command "$family")
+    if [ -z "$iptables" ]
+    then
+        return 1
+    fi
+
     echo \
-     && ip6tables -t mangle -N RAY \
-     && ip6tables -t mangle -A RAY \
-            -m pkttype \
-            --pkt-type broadcast \
-            -j RETURN \
-     && ip6tables -t mangle -A RAY \
-            -m pkttype \
-            --pkt-type multicast \
-            -j RETURN \
-     && ip6tables -t mangle -A RAY \
-            -d "$( get_ip_addrs '6' )" \
-            -j RETURN \
-     && ip6tables -t mangle -A RAY \
-            -j TPROXY \
-            -p udp \
-            --on-port "$RAY_PORT" \
-            --tproxy-mark "$REROUTE_FW_MK" \
-     && ip6tables -t mangle -A RAY \
-            -j TPROXY \
-            -p tcp \
-            --on-port "$RAY_PORT" \
-            --tproxy-mark "$REROUTE_FW_MK" \
-     && ip6tables -t mangle -A PREROUTING -j RAY \
-     && ip6tables -nvL RAY -t mangle
+     && ( \
+            (   "$iptables" --table mangle -C PREROUTING -j "$CHAIN" \
+                && "$iptables" --table mangle -D PREROUTING -j "$CHAIN" \
+            ) \
+         || return 0 \
+        ) \
+     && (   [ -z "$( "$iptables" --numeric --table mangle --list "$CHAIN" 2>/dev/null )" ] \
+         || (   "$iptables" --table mangle --flush "$CHAIN" \
+             && "$iptables" --table mangle --delete-chain "$CHAIN" \
+            ) \
+        ) \
+      ;
 }
 
 function setup_routing() {
@@ -146,4 +166,32 @@ function setup_routing() {
 # get re-routed to device local.
 # If not re-routed, the packages cannot be received by Ray.
 
-setup_iptables && setup_ip6tables && setup_routing && run_xray
+function main() {
+    echo \
+      && setup_iptables '4' \
+      && setup_iptables '6' \
+      && setup_routing \
+      && run_xray
+}
+
+function refresh_iptables() {
+    echo \
+      && teardown_iptables '4' \
+      && teardown_iptables '6' \
+      && setup_iptables '4' \
+      && setup_iptables '6'
+}
+
+if (($# < 1))
+then
+    main
+else
+    case "$1" in 
+        refresh-iptables)
+            refresh_iptables
+            ;;
+        *)
+            echo "Unrecognized sub-command '${1}'." \
+              && exit 1
+    esac
+fi
