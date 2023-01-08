@@ -80,7 +80,7 @@ function setup_iptables() {
         return 1
     fi
 
-    echo \
+    (return 0) \
      && "$iptables" -t mangle -N "$CHAIN" \
      && "$iptables" -t mangle -A "$CHAIN" \
             -m pkttype \
@@ -103,8 +103,10 @@ function setup_iptables() {
             -p tcp \
             --on-port "$RAY_PORT" \
             --tproxy-mark "$REROUTE_FW_MK" \
-     && "$iptables" -t mangle -A PREROUTING -j "$CHAIN" \
-     && "$iptables" -nvL "$CHAIN" -t mangle
+     && "$iptables" -t mangle -A PREROUTING \
+            -j "$CHAIN" \
+     && "$iptables" -n -t mangle --list "$CHAIN" \
+      ;
 }
 # Self-skipping
 # Packages targeting ip_addr are not t-proxied,
@@ -130,23 +132,38 @@ function teardown_iptables() {
         return 1
     fi
 
-    echo \
+    (return 0) \
      && ( \
-            (   "$iptables" --table mangle -C PREROUTING -j "$CHAIN" \
-                && "$iptables" --table mangle -D PREROUTING -j "$CHAIN" \
+            (   "$iptables" \
+                    --table mangle \
+                    -C PREROUTING \
+                    -j "$CHAIN" \
+                && "$iptables" \
+                    --table mangle \
+                    -D PREROUTING \
+                    -j "$CHAIN" \
             ) \
          || return 0 \
         ) \
-     && (   [ -z "$( "$iptables" --numeric --table mangle --list "$CHAIN" 2>/dev/null )" ] \
-         || (   "$iptables" --table mangle --flush "$CHAIN" \
-             && "$iptables" --table mangle --delete-chain "$CHAIN" \
+     && (   [ -z "$( "$iptables" \
+                        --numeric \
+                        --table mangle \
+                        --list "$CHAIN" \
+                        2>/dev/null \
+                    )" ] \
+         || (   "$iptables" \
+                    --table mangle \
+                    --flush "$CHAIN" \
+             && "$iptables" \
+                    --table mangle \
+                    --delete-chain "$CHAIN" \
             ) \
         ) \
       ;
 }
 
 function setup_routing() {
-    echo \
+    (return 0) \
      && ip rule add \
             fwmark "$REROUTE_FW_MK" \
             lookup "$RT_TABLE_NO" \
@@ -167,19 +184,19 @@ function setup_routing() {
 # If not re-routed, the packages cannot be received by Ray.
 
 function main() {
-    echo \
+    (return 0) \
       && setup_iptables '4' \
       && setup_iptables '6' \
       && setup_routing \
-      && run_xray
+      && run_xray \
+       ;
 }
 
 function refresh_iptables() {
-    echo \
-      && teardown_iptables '4' \
-      && teardown_iptables '6' \
-      && setup_iptables '4' \
-      && setup_iptables '6'
+    (return 0) \
+      && teardown_iptables "$1" \
+      && setup_iptables "$1" \
+       ;
 }
 
 if (($# < 1))
@@ -188,7 +205,7 @@ then
 else
     case "$1" in 
         refresh-iptables)
-            refresh_iptables
+            refresh_iptables "$2"
             ;;
         *)
             echo "Unrecognized sub-command '${1}'." \
