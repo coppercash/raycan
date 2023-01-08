@@ -17,7 +17,7 @@
 # Host is not involved in the entire data-flow.
 # Thus, it can use TProxy as gateway as well.
 
-set -ux
+set -u
 
 declare -r RAY_CFG_DIR='/etc/raycan' 
 declare -r RAY_PORT=5100
@@ -46,16 +46,6 @@ function run_xray() {
         -confdir "$XRAY_EXT_CFG_DIR"
 }
 
-function get_ip_addrs() {
-    local -r family=$1
-    local -r dev=eth0
-    ip -"$family" address show dev "$dev" \
-        | grep 'inet' \
-        | cut -d' ' -f6 \
-        | cut -d'/' -f1 \
-        | paste -s -d','
-}
-
 function get_iptables_command() {
     local -r family=$1
     case "$family" in 
@@ -67,12 +57,6 @@ function get_iptables_command() {
 
 function setup_iptables() {
     local -r family=$1
-
-    local -r addrs=$(get_ip_addrs "$family")
-    if [ -z "$addrs" ]
-    then
-        return
-    fi
 
     local -r iptables=$(get_iptables_command "$family")
     if [ -z "$iptables" ]
@@ -91,7 +75,8 @@ function setup_iptables() {
             --pkt-type multicast \
             -j RETURN \
      && "$iptables" -t mangle -A "$CHAIN" \
-            -d "$addrs" \
+            -m addrtype \
+            --dst-type LOCAL \
             -j RETURN \
      && "$iptables" -t mangle -A "$CHAIN" \
             -j TPROXY \
