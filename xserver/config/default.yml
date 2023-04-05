@@ -22,3 +22,11 @@ outbounds:
   protocol: freedom
 - tag: block
   protocol: blackhole
+- tag: wireguard
+  protocol: freedom
+  streamSettings:
+    sockopt:
+      tcpFastOpen: true
+      interface: wg0
+  settings:
+    domainStrategy: AsIs

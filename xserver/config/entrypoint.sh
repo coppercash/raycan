@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# TODO:
+
 set -u
 
 declare -r VAR_DIR='/var/raycan'
@@ -26,7 +28,9 @@ function make_website() {
     mkdir -p "$HTML_DIR" \
  && wget \
         "$source" \
-        -O "${HTML_DIR}/index.html"
+        -O "${HTML_DIR}/index.html" \
+ && echo "Website made." \
+  ;
 }
 
 function run_nginx() {
@@ -39,12 +43,14 @@ function run_nginx() {
       }
     }" \
     > "${NGX_CFG_DIR}/nginx.conf" \
-    && nginx
+ && nginx \
+ && echo "Nginx started." \
+     ;
 }
 
 function acmesh_test() {
     mkdir -p "$ACME_LOG_DIR" \
-    && acme.sh --issue \
+ && acme.sh --issue \
         -d "$SERVER_NAME" \
         -w "$HTML_DIR" \
         --nginx \
@@ -54,6 +60,8 @@ function acmesh_test() {
         --test \
         --debug 3 \
         --log "${ACME_LOG_DIR}/test.log"
+ && echo "ACME test passed." \
+     ;
 }
 
 function acmesh_issue() {
@@ -65,7 +73,9 @@ function acmesh_issue() {
         --keylength "$KEY_LENGTH" \
         --home "$ACME_HOME_DIR" \
         --config-home "$ACME_CFG_DIR" \
-        --log "${ACME_LOG_DIR}/issue.log"
+        --log "${ACME_LOG_DIR}/issue.log" \
+ && echo "ACME issued." \
+  ;
     case $? in
         0) return 0;; # Certificate issuing succeeded
         2) return 0;; # Certfiicate has not been expired
@@ -82,7 +92,9 @@ function acmesh_install() {
         --config-home "$ACME_CFG_DIR" \
         --log "${ACME_LOG_DIR}/install-cert.log" \
         --key-file "${XRAY_CRT_DIR}/key.pem" \
-        --fullchain-file "${XRAY_CRT_DIR}/cert.pem"
+        --fullchain-file "${XRAY_CRT_DIR}/cert.pem" \
+ && echo "ACME installed." \
+  ;
 }
 
 function run_xray() {
@@ -96,21 +108,27 @@ function run_xray() {
  && cd ~ \
  && xray \
         -config "${XRAY_CFG_DIR}/default.json" \
-        -confdir "$XRAY_EXT_CFG_DIR"
+        -confdir "$XRAY_EXT_CFG_DIR" \
+  ;
+}
+
+function run_wireguard() {
+    [ -f /etc/wireguard/wg0 ] \
+ && modprobe ip6table_raw \
+ && wg-quick down wg0 \
+ && wg-quick up wg0 \
+ && echo "Wiregard up." \
+  ;
 }
 
 function main() {
     echo "Running with '${SERVER_NAME}' ..." \
+ && run_wireguard \
  && make_website \
- && echo "Website made." \
  && run_nginx \
- && echo "Nginx started." \
  && acmesh_test \
- && echo "ACME test passed." \
  && acmesh_issue \
- && echo "ACME issued." \
  && acmesh_install \
- && echo "ACME installed." \
  && run_xray \
   ;
 }
