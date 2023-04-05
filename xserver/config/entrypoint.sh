@@ -117,7 +117,8 @@ function run_wireguard() {
     then
         return 0
     fi
-    wg-quick up wg0 \
+    modprobe ip6table_raw \
+ && wg-quick up wg0 \
  && echo "Wiregard up." \
   ;
 }
