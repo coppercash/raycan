@@ -113,13 +113,11 @@ function run_xray() {
 }
 
 function run_wireguard() {
-    if [ -f /etc/wireguard/wg0 ]
+    if [ ! -f /etc/wireguard/wg0.conf ]
     then
         return 0
     fi
-    modprobe ip6table_raw \
- && wg-quick down wg0 \
- && wg-quick up wg0 \
+    wg-quick up wg0 \
  && echo "Wiregard up." \
   ;
 }
