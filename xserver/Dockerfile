@@ -1,6 +1,10 @@
-FROM alpine:3.13
+# TODO:
+# * drop 3.0.5 after acme.sh
+
+FROM alpine:3.17
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
+ARG PODTMP="/tmp/pod"
 ARG YQ_FILE="/usr/local/bin/yq"
 ARG XRAY_FILE="/usr/local/bin/xray"
 ARG XRAY_DATA_DIR="/usr/local/share/xray"
@@ -14,67 +18,82 @@ ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
 
 RUN apk add --update --no-cache \
         nginx \
-
-# Needed by acme.sh
-# wget doen't work for acme.sh, but curl does.
-# Guessing it is a bug.
         openssl \
         git \
         curl \
+        # Needed by acme.sh
+        # wget doen't work for acme.sh, but curl does.
+        # Guessing it is a bug.
 
- && mkdir -p "/tmp/acmesh" \
- && cd "/tmp/acmesh" \
- && git clone --depth 1 \
-        "https://github.com/acmesh-official/acme.sh.git" \
-        . \
- && ./acme.sh --install  \
-        --home ${ACME_HOME_DIR} \
-        --config-home ${ACME_CFG_DIR} \
-        --cert-home ${ACME_CRT_DIR} \
- && cd ~ \
- && rm -r "/tmp/acmesh" \
- && echo $'#!/bin/sh\n/usr/local/bin/acmesh/acme.sh "$@"' > ${ACME_EXE}  \
- && chmod +x ${ACME_EXE} \
+        ### Deps of wgcf ###
+        ca-certificates \
+        iproute2 net-tools iptables \
+        wireguard-tools openresolv \
+
+ && mkdir "$PODTMP" \
+ && wget \
+        "https://codeload.github.com/acmesh-official/acme.sh/tar.gz/refs/tags/3.0.5" \
+        -O "${PODTMP}/acme.sh.tar.gz" \
+
 # Function to retrieve download URL.
- && GET_DOWNLOAD_URL() { \
-        wget -q -O - "https://api.github.com/repos/${1}/releases/latest" \
+ && GITHUB_URL() { \
+        wget -q -O - "https://api.github.com/repos/${1}/releases/tags/${2}" \
         | grep "browser_download_url" \
-        | grep ${2} \
+        | grep "$3" \
         | head -n 1 \
         | cut -d `printf "\x22"` -f 4 \
         ; \
     } \
-# Install yq.
- && YQ_URL=$(GET_DOWNLOAD_URL "mikefarah/yq" "linux_amd64") \
- && echo "Downloading yq from ${YQ_URL} ..." \
- && wget ${YQ_URL} -O ${YQ_FILE} \
- && chmod +x ${YQ_FILE} \
- && echo "yq downloaded!" \
-# Install xray.
- && XRAY_URL=$(GET_DOWNLOAD_URL "xtls/xray-core" "linux-64") \
- && echo "Downloading xray from ${XRAY_URL} ..." \
- && wget ${XRAY_URL} -O "/tmp/xray.zip" \
- && unzip "/tmp/xray.zip" -d "/tmp/xray" \
- && mv "/tmp/xray/xray" ${XRAY_FILE} \
- && mkdir -p ${XRAY_DATA_DIR} \
- && mv "/tmp/xray/geosite.dat" "${XRAY_DATA_DIR}/geosite.dat" \
- && mv "/tmp/xray/geoip.dat" "${XRAY_DATA_DIR}/geoip.dat" \
- && chmod +x ${XRAY_FILE} \
- && rm "/tmp/xray.zip" \
- && rm -r "/tmp/xray" \
- && echo "xray downloaded!"
+ && GITHUB_DOWNLOAD() { \
+        url=$(GITHUB_URL "$1" "$2" "$4") \
+        && echo "Downloading ${1}@${2} (arch ${4}) from ${url} ..." \
+        && wget "$url" -O "$3" \
+         ; \
+    } \
+ && GITHUB_DOWNLOAD "mikefarah/yq" "v4.33.2" "$YQ_FILE" "linux_amd64" \
+ && GITHUB_DOWNLOAD "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
+ && GITHUB_DOWNLOAD "ViRb3/wgcf" "v2.2.15" "/usr/local/bin/wgcf" "linux_amd64" \
+  ;
 
-COPY "./default.yml" "./entrypoint.sh" "/tmp/"
+COPY \
+    "./config/default.yml" \
+    "./config/entrypoint.sh" \
+    "$PODTMP"
+
 # Entrypoint
-RUN mv "/tmp/entrypoint.sh" $ENTRYPOINT_FILE \
- && chmod +x $ENTRYPOINT_FILE \
+RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
+ && chmod +x "$ENTRYPOINT_FILE" \
+# yq
+ && chmod +x "$YQ_FILE" \
+# wgcf
+ && chmod +x "/usr/local/bin/wgcf" \
+# XRay
+ && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
+ && mv "${PODTMP}/xray/xray" "$XRAY_FILE" \
+ && mkdir -p "$XRAY_DATA_DIR" \
+ && mv "${PODTMP}/xray/geosite.dat" "${XRAY_DATA_DIR}/geosite.dat" \
+ && mv "${PODTMP}/xray/geoip.dat" "${XRAY_DATA_DIR}/geoip.dat" \
+ && chmod +x "$XRAY_FILE" \
+ && rm "${PODTMP}/xray.zip" \
+ && rm -r "${PODTMP}/xray" \
 # XRay Default Config
- && mkdir -p ${XRAY_CFG_DIR} \
- && mkdir -p ${XRAY_EXT_CFG_DIR} \
- && yq -o=json eval "/tmp/default.yml" > "${XRAY_CFG_DIR}/default.json" \
- && rm "/tmp/default.yml" \
-# nginx
- && mkdir -p "/var/run/nginx"
+ && mkdir -p "$XRAY_CFG_DIR" \
+ && yq -o=json eval "${PODTMP}/default.yml" > "${XRAY_CFG_DIR}/default.json" \
+ && rm "${PODTMP}/default.yml" \
+# acmesh
+ && tar -zxf "${PODTMP}/acme.sh.tar.gz" --directory "${PODTMP}" \
+ && cd "${PODTMP}/acme.sh-3.0.5" \
+ && "./acme.sh" --install  \
+        --home "$ACME_HOME_DIR" \
+        --config-home "$ACME_CFG_DIR" \
+        --cert-home "$ACME_CRT_DIR" \
+ && cd / \
+ && rm -rf "${PODTMP}/acme.sh-3.0.5" \
+ && echo $'#!/bin/bash\n/usr/local/bin/acmesh/acme.sh "$@"' > "$ACME_EXE" \
+ && chmod +x "$ACME_EXE" \
 
-ENTRYPOINT "/usr/local/bin/entrypoint.sh"
-# Don't know how to use variable with ENTRYPOINT.
+# clean up
+ && rm -r "${PODTMP}" \
+  ;
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
