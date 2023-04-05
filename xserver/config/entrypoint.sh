@@ -59,7 +59,7 @@ function acmesh_test() {
         --config-home "$ACME_CFG_DIR" \
         --test \
         --debug 3 \
-        --log "${ACME_LOG_DIR}/test.log"
+        --log "${ACME_LOG_DIR}/test.log" \
  && echo "ACME test passed." \
      ;
 }

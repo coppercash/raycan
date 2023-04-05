@@ -49,7 +49,6 @@ RUN apk add --update --no-cache \
     } \
  && GITHUB_DOWNLOAD "mikefarah/yq" "v4.33.2" "$YQ_FILE" "linux_amd64" \
  && GITHUB_DOWNLOAD "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
- && GITHUB_DOWNLOAD "ViRb3/wgcf" "v2.2.15" "/usr/local/bin/wgcf" "linux_amd64" \
   ;
 
 COPY \
@@ -62,8 +61,6 @@ RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
  && chmod +x "$ENTRYPOINT_FILE" \
 # yq
  && chmod +x "$YQ_FILE" \
-# wgcf
- && chmod +x "/usr/local/bin/wgcf" \
 # XRay
  && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
  && mv "${PODTMP}/xray/xray" "$XRAY_FILE" \
