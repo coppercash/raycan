@@ -16,7 +16,8 @@ declare -r ACME_CFG_DIR='/etc/acmesh'
 declare -r ACME_LOG_DIR="${VAR_DIR}/acmesh/log"
 
 function make_website() {
-    ls "$HTML_DIR"
+    local -r source='https://raw.githubusercontent.com/Metroxe/one-html-page-challenge/070f33d8a5073560e3f377c9594a15162072881b/entries/ping-pong.html'
+
     if [ -f "${HTML_DIR}/index.html" ]
     then
         return 0
@@ -24,7 +25,7 @@ function make_website() {
 
     mkdir -p "$HTML_DIR" \
  && wget \
-        https://raw.githubusercontent.com/Metroxe/one-html-page-challenge/070f33d8a5073560e3f377c9594a15162072881b/entries/ping-pong.html \
+        "$source" \
         -O "${HTML_DIR}/index.html"
 }
 
