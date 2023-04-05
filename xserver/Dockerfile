@@ -1,5 +1,6 @@
 # TODO:
 # * drop 3.0.5 after acme.sh
+# * drop git
 
 FROM alpine:3.17
 LABEL maintainer="Will <coderdreamer@gmail.com>"
@@ -24,11 +25,7 @@ RUN apk add --update --no-cache \
         # Needed by acme.sh
         # wget doen't work for acme.sh, but curl does.
         # Guessing it is a bug.
-
-        ### Deps of wgcf ###
-        ca-certificates \
-        iproute2 net-tools iptables \
-        wireguard-tools openresolv \
+        wireguard-tools \
 
  && mkdir "$PODTMP" \
  && wget \
