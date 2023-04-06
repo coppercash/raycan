@@ -76,6 +76,7 @@ function acmesh_register() {
  && acme.sh --register-account \
         -m "$EMAIL" \
         --server zerossl \
+        --config-home "$ACME_CFG_DIR" \
  && echo "ACME registered." \
   ;
 }
@@ -84,7 +85,7 @@ function acmesh_issue() {
     mkdir -p "$ACME_LOG_DIR" \
  && acme.sh --issue \
         --server zerossl \
-        --dns dns_cf \
+        -m "$EMAIL" \
         -d "$SERVER_NAME" \
         -w "$HTML_DIR" \
         --nginx \
