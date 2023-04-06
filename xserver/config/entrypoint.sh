@@ -71,9 +71,20 @@ function acmesh_test() {
   ;
 }
 
+function acmesh_register() {
+    mkdir -p "$ACME_LOG_DIR" \
+ && acme.sh --register-account \
+        -m "$EMAIL" \
+        --server zerossl \
+ && echo "ACME registered." \
+  ;
+}
+
 function acmesh_issue() {
     mkdir -p "$ACME_LOG_DIR" \
  && acme.sh --issue \
+        --server zerossl \
+        --dns dns_cf \
         -d "$SERVER_NAME" \
         -w "$HTML_DIR" \
         --nginx \
@@ -134,7 +145,7 @@ function main() {
  && run_wireguard \
  && make_website \
  && run_nginx \
- && acmesh_test \
+ && acmesh_register \
  && acmesh_issue \
  && acmesh_install \
  && run_xray \
