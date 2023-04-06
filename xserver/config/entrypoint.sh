@@ -15,6 +15,7 @@ declare -r HTML_DIR='/var/html'
 declare -r KEY_LENGTH='ec-256'
 declare -r ACME_HOME_DIR='/usr/local/bin/acmesh'
 declare -r ACME_CFG_DIR="/etc/acmesh"
+declare -r ACME_CRT_DIR="${VAR_DIR}/acmesh/cert"
 declare -r ACME_LOG_DIR="${VAR_DIR}/acmesh/log"
 
 function make_website() {
@@ -49,6 +50,11 @@ function run_nginx() {
 }
 
 function acmesh_test() {
+    if [ -d "$ACME_CRT_DIR" ] && [ ! -z "$(ls -A "$ACME_CRT_DIR")" ]
+    then
+        return 0
+    fi
+
     mkdir -p "$ACME_LOG_DIR" \
  && acme.sh --issue \
         -d "$SERVER_NAME" \
@@ -60,6 +66,7 @@ function acmesh_test() {
         --test \
         --debug 3 \
         --log "${ACME_LOG_DIR}/test.log" \
+ && rm -rf "${ACME_CRT_DIR}/*" \
  && echo "ACME test passed." \
   ;
 }
