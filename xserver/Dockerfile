@@ -6,16 +6,6 @@ FROM alpine:3.17
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
 ARG PODTMP="/tmp/pod"
-ARG YQ_FILE="/usr/local/bin/yq"
-ARG XRAY_FILE="/usr/local/bin/xray"
-ARG XRAY_DATA_DIR="/usr/local/share/xray"
-ARG XRAY_CFG_DIR="/etc/xray"
-ARG XRAY_EXT_CFG_DIR="/etc/xray/ext"
-ARG ACME_EXE="/usr/local/bin/acme.sh"
-ARG ACME_CRT_DIR="/var/acmesh/cert"
-ARG ACME_HOME_DIR="/usr/local/bin/acmesh"
-ARG ACME_CFG_DIR="/etc/acmesh"
-ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
 
 RUN apk add --update --no-cache \
         nginx \
@@ -47,7 +37,7 @@ RUN apk add --update --no-cache \
         && wget "$url" -O "$3" \
          ; \
     } \
- && GITHUB_DOWNLOAD "mikefarah/yq" "v4.33.2" "$YQ_FILE" "linux_amd64" \
+ && GITHUB_DOWNLOAD "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
  && GITHUB_DOWNLOAD "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
   ;
 
@@ -56,10 +46,22 @@ COPY \
     "./config/entrypoint.sh" \
     "$PODTMP"
 
+ARG YQ_FILE="/usr/local/bin/yq"
+ARG XRAY_FILE="/usr/local/bin/xray"
+ARG XRAY_DATA_DIR="/usr/local/share/xray"
+ARG XRAY_CFG_DIR="/etc/xray"
+ARG XRAY_EXT_CFG_DIR="/etc/xray/ext"
+ARG ACME_EXE="/usr/local/bin/acme.sh"
+ARG ACME_CRT_DIR="/var/raycan/acmesh/cert"
+ARG ACME_HOME_DIR="/usr/local/bin/acmesh"
+ARG ACME_CFG_DIR="/etc/acmesh"
+ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
+
 # Entrypoint
 RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
  && chmod +x "$ENTRYPOINT_FILE" \
 # yq
+ && mv "${PODTMP}/yq" "$YQ_FILE" \
  && chmod +x "$YQ_FILE" \
 # XRay
  && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
