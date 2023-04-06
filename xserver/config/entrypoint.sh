@@ -14,7 +14,7 @@ declare -r NGX_CFG_DIR='/etc/nginx'
 declare -r HTML_DIR='/var/html'
 declare -r KEY_LENGTH='ec-256'
 declare -r ACME_HOME_DIR='/usr/local/bin/acmesh'
-declare -r ACME_CFG_DIR="${VAR_DIR}/acmesh/config"
+declare -r ACME_CFG_DIR="/etc/acmesh"
 declare -r ACME_LOG_DIR="${VAR_DIR}/acmesh/log"
 
 function make_website() {
@@ -56,7 +56,7 @@ function acmesh_test() {
         --nginx \
         --keylength "$KEY_LENGTH" \
         --home "$ACME_HOME_DIR" \
-        --config-home '/tmp/acmesh' \
+        --config-home "$ACME_CFG_DIR" \
         --test \
         --debug 3 \
         --log "${ACME_LOG_DIR}/test.log" \
