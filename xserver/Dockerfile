@@ -23,7 +23,7 @@ RUN apk add --update --no-cache \
         -O "${PODTMP}/acme.sh.tar.gz" \
 
 # Function to retrieve download URL.
- && GITHUB_URL() { \
+ && github_url() { \
         wget -q -O - "https://api.github.com/repos/${1}/releases/tags/${2}" \
         | grep "browser_download_url" \
         | grep "$3" \
@@ -31,14 +31,14 @@ RUN apk add --update --no-cache \
         | cut -d `printf "\x22"` -f 4 \
         ; \
     } \
- && GITHUB_DOWNLOAD() { \
-        url=$(GITHUB_URL "$1" "$2" "$4") \
+ && github_download() { \
+        url=$(github_url "$1" "$2" "$4") \
         && echo "Downloading ${1}@${2} (arch ${4}) from ${url} ..." \
         && wget "$url" -O "$3" \
          ; \
     } \
- && GITHUB_DOWNLOAD "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
- && GITHUB_DOWNLOAD "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
+ && github_download "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
+ && github_download "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
   ;
 
 COPY \
@@ -55,7 +55,7 @@ ARG ACME_EXE="/usr/local/bin/acme.sh"
 ARG ACME_CRT_DIR="/var/raycan/acmesh/cert"
 ARG ACME_HOME_DIR="/usr/local/bin/acmesh"
 ARG ACME_CFG_DIR="/etc/acmesh"
-ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint.sh"
+ARG ENTRYPOINT_FILE="/usr/local/bin/entrypoint"
 
 # Entrypoint
 RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
@@ -89,7 +89,7 @@ RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
  && chmod +x "$ACME_EXE" \
 
 # clean up
- && rm -r "${PODTMP}" \
+ && rm -r "$PODTMP" \
   ;
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["entrypoint"]

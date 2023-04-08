@@ -1,7 +1,7 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
-ARG TMPDIR="/tmp/pod"
+ARG PODTMP="/tmp/pod"
 
 RUN echo \
  && microdnf \
@@ -10,59 +10,56 @@ RUN echo \
         iptables iproute iputils unzip findutils \
  && microdnf \
         clean all \
- && mkdir -p "$TMPDIR" \
+ && mkdir -p "$PODTMP" \
 # Function to retrieve download URL.
- && get_download_url() { \
-        curl -L "https://api.github.com/repos/${1}/releases/latest" \
+ && github_url() { \
+        wget -q -O - "https://api.github.com/repos/${1}/releases/tags/${2}" \
         | grep "browser_download_url" \
-        | grep "${2}" \
+        | grep "$3" \
         | head -n 1 \
-        | cut -d $( printf "\x22" ) -f 4 \
+        | cut -d `printf "\x22"` -f 4 \
         ; \
     } \
-# Function to download from github.
- && download() { \
-        src="$( get_download_url "$1" "$2" )" \
-        && echo "Downloading ${1} from ${src} to ${3} ..." \
-        && curl --location \
-            "$src" \
-            --output "$3" \
-        ; \
+ && github_download() { \
+        url=$(github_url "$1" "$2" "$4") \
+        && echo "Downloading ${1}@${2} (arch ${4}) from ${url} ..." \
+        && wget "$url" -O "$3" \
+         ; \
     } \
- && download "mikefarah/yq" "linux_amd64" "${TMPDIR}/yq" \
- && download "xtls/xray-core" "linux-64" "${TMPDIR}/xray.zip" \
- && echo
+ && github_download "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
+ && github_download "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
+  ;
 
 COPY \
     "./default.yml" \
     "./entrypoint.sh" \
-    "${TMPDIR}"
+    "${PODTMP}"
 
 RUN echo \
 # Install XRay.
- && unzip "${TMPDIR}/xray.zip" -d "${TMPDIR}/xray" \
- && chmod +x "${TMPDIR}/xray/xray" \
- && mv "${TMPDIR}/xray/xray" "/usr/local/bin/xray" \
+ && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
+ && chmod +x "${PODTMP}/xray/xray" \
+ && mv "${PODTMP}/xray/xray" "/usr/local/bin/xray" \
  && mkdir -p "/usr/local/share/xray" \
  && mv -t "/usr/local/share/xray" \
-        "${TMPDIR}/xray/geosite.dat" \
-        "${TMPDIR}/xray/geoip.dat"  \
- && rm "${TMPDIR}/xray.zip" \
- && rm -r "${TMPDIR}/xray" \
+        "${PODTMP}/xray/geosite.dat" \
+        "${PODTMP}/xray/geoip.dat"  \
+ && rm "${PODTMP}/xray.zip" \
+ && rm -r "${PODTMP}/xray" \
 # Install yq.
- && chmod +x "${TMPDIR}/yq" \
- && mv "${TMPDIR}/yq" "/usr/local/bin/yq" \
+ && chmod +x "${PODTMP}/yq" \
+ && mv "${PODTMP}/yq" "/usr/local/bin/yq" \
 # XRay Default Config
  && mkdir -p "/etc/xray" \
- && yq -o=json eval "${TMPDIR}/default.yml" > "/etc/xray/default.json" \
- && rm "${TMPDIR}/default.yml" \
+ && yq -o=json eval "${PODTMP}/default.yml" > "/etc/xray/default.json" \
+ && rm "${PODTMP}/default.yml" \
  && mkdir -p "/etc/xray/ext" \
  && mkdir -p "/var/log/xray" \
 # Entrypoint
- && chmod +x "${TMPDIR}/entrypoint.sh" \
- && mv "${TMPDIR}/entrypoint.sh" "/usr/local/bin/entrypoint" \
+ && chmod +x "${PODTMP}/entrypoint.sh" \
+ && mv "${PODTMP}/entrypoint.sh" "/usr/local/bin/entrypoint" \
 # Clean up.
- && rm -r "$TMPDIR" \
- && echo
+ && rm -r "$PODTMP" \
+  ;
 
 ENTRYPOINT ["entrypoint"]
