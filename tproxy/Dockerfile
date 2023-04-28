@@ -13,7 +13,7 @@ RUN echo \
  && mkdir -p "$PODTMP" \
 # Function to retrieve download URL.
  && github_url() { \
-        wget -q -O - "https://api.github.com/repos/${1}/releases/tags/${2}" \
+        curl --location "https://api.github.com/repos/${1}/releases/tags/${2}" \
         | grep "browser_download_url" \
         | grep "$3" \
         | head -n 1 \
@@ -23,7 +23,7 @@ RUN echo \
  && github_download() { \
         url=$(github_url "$1" "$2" "$4") \
         && echo "Downloading ${1}@${2} (arch ${4}) from ${url} ..." \
-        && wget "$url" -O "$3" \
+        && curl --location "$url" --output "$3" \
          ; \
     } \
  && github_download "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
