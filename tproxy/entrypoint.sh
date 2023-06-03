@@ -10,8 +10,8 @@
 # Clients (route table main default via TProxy) ->
 # TProxy (iptables --tproxy-mark REROUTE_FW_MK) ->
 # TProxy (ip rule fwmark REROUTE_FW_MK dev lo) ->
-# Ray:RAY_PORT
-# Gateway
+# Ray:RAY_PORT ->
+# Gateway ->
 # Internet / Proxy Server
 #
 # Host is not involved in the entire data-flow.
