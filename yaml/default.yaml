@@ -1,5 +1,5 @@
 outbounds:
-- tag: direct
+- tag: freedom
   protocol: freedom
-- tag: block
+- tag: blackhole
   protocol: blackhole

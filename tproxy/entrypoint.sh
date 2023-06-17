@@ -17,7 +17,7 @@
 # Host is not involved in the entire data-flow.
 # Thus, it can use TProxy as gateway as well.
 
-set -u
+set -ux
 
 declare -r RAY_CFG_DIR='/etc/raycan' 
 declare -r RAY_PORT=5100
@@ -173,8 +173,9 @@ function main() {
       && setup_iptables '4' \
       && setup_iptables '6' \
       && setup_routing \
-      && run_xray \
+      && socat TCP-LISTEN:${RAY_PORT} STDOUT \
        ;
+      #&& run_xray \
 }
 
 function refresh_iptables() {
@@ -184,16 +185,12 @@ function refresh_iptables() {
        ;
 }
 
-if (($# < 1))
-then
-    main
-else
-    case "$1" in 
-        refresh-iptables)
-            refresh_iptables "$2"
-            ;;
-        *)
-            echo "Unrecognized sub-command '${1}'." \
-              && exit 1
-    esac
+run() {
+    #socat TCP-LISTEN:${RAY_PORT} STDOUT \
+    socat -d -d tcp4-listen:${RAY_PORT},ip-transparent STDOUT
+}
+
+if ((0 < $#))
+then ${@:1}
+else main
 fi
