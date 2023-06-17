@@ -1,53 +1,26 @@
-#!/usr/bin/env bash
-
-# Clients: the hosts or containers use TProxy as gateway.
-# TProxy: This container.
-# Ray: v2ray (or xray).
-# Host: The physical machine hosts this container.
-# Gateway: The gateway shared by TProxy and Host.
-#
-# Data Flow:
-# Clients (route table main default via TProxy) ->
-# TProxy (iptables --tproxy-mark REROUTE_FW_MK) ->
-# TProxy (ip rule fwmark REROUTE_FW_MK dev lo) ->
-# Ray:RAY_PORT ->
-# Gateway ->
-# Internet / Proxy Server
-#
-# Host is not involved in the entire data-flow.
-# Thus, it can use TProxy as gateway as well.
+#!/usr/bin/env sh
 
 set -ux
 
-declare -r RAY_CFG_DIR='/etc/raycan' 
-declare -r RAY_PORT=5100
-declare -r XRAY_CFG_DIR='/etc/xray'
-declare -r XRAY_EXT_CFG_DIR="${XRAY_CFG_DIR}/ext"
+# Clients: The hosts or containers use TProxy as gateway.
+# TProxy: This container.
+# Port: A local (mandatory) port the traffic gets forwarded to.
+# Process: A process runs in user mode that proceeds the traffic.
+#
+# Data Flow:
+# Clients (route table main default via TProxy) ->
+# TProxy (iptables --tproxy-mark `REROUTE_FW_MK`) ->
+# TProxy (ip rule fwmark `REROUTE_FW_MK` dev lo) ->
+# Port ->
+# Process ->
 
-declare -r REROUTE_FW_MK=0x1
-declare -r RT_TABLE_NO=50
+REROUTE_FW_MK='0x1'
+RT_TABLE_NO='50'
+CHAIN='TPRX'
+PORT='50000'
 
-declare -r CHAIN='RAY'
-
-function convert_config() {
-    find /etc/raycan \
-        -type f \( -iname \*.yaml -o -iname \*.yml \) \
-        -exec sh -c \
-            'yq -o=json eval $0 > "/etc/xray/ext/$( basename $0 | cut -d. -f1 ).json"' {} \; \
-    && ls /etc/xray/ext
-}
-
-function run_xray() {
-    if [ -d "$RAY_CFG_DIR" ]; then
-        convert_config
-    fi
-    xray \
-        -config "${XRAY_CFG_DIR}/default.json" \
-        -confdir "$XRAY_EXT_CFG_DIR"
-}
-
-function get_iptables_command() {
-    local -r family=$1
+iptables_command() {
+    local family="$1"
     case "$family" in 
         4) echo 'iptables';;
         6) echo 'ip6tables';;
@@ -55,139 +28,146 @@ function get_iptables_command() {
     esac
 }
 
-function setup_iptables() {
-    local -r family=$1
-
-    local -r iptables=$(get_iptables_command "$family")
-    if [ -z "$iptables" ]
-    then
-        return 1
-    fi
-
-    (return 0) \
-     && "$iptables" -t mangle -N "$CHAIN" \
-     && "$iptables" -t mangle -A "$CHAIN" \
-            -m pkttype \
-            --pkt-type broadcast \
-            -j RETURN \
-     && "$iptables" -t mangle -A "$CHAIN" \
-            -m pkttype \
-            --pkt-type multicast \
-            -j RETURN \
-     && "$iptables" -t mangle -A "$CHAIN" \
-            -m addrtype \
-            --dst-type LOCAL \
-            -j RETURN \
-     && "$iptables" -t mangle -A "$CHAIN" \
-            -j TPROXY \
-            -p udp \
-            --on-port "$RAY_PORT" \
-            --tproxy-mark "$REROUTE_FW_MK" \
-     && "$iptables" -t mangle -A "$CHAIN" \
-            -j TPROXY \
-            -p tcp \
-            --on-port "$RAY_PORT" \
-            --tproxy-mark "$REROUTE_FW_MK" \
-     && "$iptables" -t mangle -A PREROUTING \
-            -j "$CHAIN" \
-     && "$iptables" -n -t mangle --list "$CHAIN" \
-      ;
-}
-# Self-skipping
-# Packages targeting ip_addr are not t-proxied,
-# mainly the tproxy packages from the proxy server, via the host, targeting the container.
-# Given that only packages targeting ip_addr are routed into the container,
-# we don't need to setup other rules to filter out
-# packages targeting other addresses in LAN.
+# TCP/UDP traffic not targeting address of TProxy
+# but passing address of TProxy
+# are t-proxied to `Port`
+# and marked with `REROUTE_FW_MK`.
 #
-# UDP
-# UDP packages not targeting ip_addr are t-proxied
-# via Ray listening on RAY_PORT
-# and are marked with REROUTE_FW_MK.
+# Traffic targeting self.address are not t-proxied.
+# E.g. DNS traffic.
+# E.g. the traffic sent back by remote servers.
 #
-# TCP
-# Same with the previous but for TCP.
+# Given that traffic targeting other hosts in LAN
+# is routed by the gateway to them directly.
+# There is no need to setup extra rules to filter them out.
+#
+setup_iptables() {
+    local \
+        iptables="$(iptables_command $1)" \
+        tport="$PORT" \
+        ;
 
-function teardown_iptables() {
-    local -r family=$1
-
-    local -r iptables=$(get_iptables_command "$family")
-    if [ -z "$iptables" ]
-    then
-        return 1
-    fi
-
-    (return 0) \
-     && ( \
-            (   "$iptables" \
-                    --table mangle \
-                    -C PREROUTING \
-                    -j "$CHAIN" \
-                && "$iptables" \
-                    --table mangle \
-                    -D PREROUTING \
-                    -j "$CHAIN" \
-            ) \
-         || return 0 \
-        ) \
-     && (   [ -z "$( "$iptables" \
-                        --numeric \
-                        --table mangle \
-                        --list "$CHAIN" \
-                        2>/dev/null \
-                    )" ] \
-         || (   "$iptables" \
-                    --table mangle \
-                    --flush "$CHAIN" \
-             && "$iptables" \
-                    --table mangle \
-                    --delete-chain "$CHAIN" \
-            ) \
-        ) \
-      ;
+  : \
+ && "$iptables" -t mangle -N "$CHAIN" \
+ && "$iptables" -t mangle -A "$CHAIN" \
+        -m pkttype \
+        --pkt-type broadcast \
+        -j RETURN \
+ && "$iptables" -t mangle -A "$CHAIN" \
+        -m pkttype \
+        --pkt-type multicast \
+        -j RETURN \
+ && "$iptables" -t mangle -A "$CHAIN" \
+        -m addrtype \
+        --dst-type LOCAL \
+        -j RETURN \
+ && "$iptables" -t mangle -A "$CHAIN" \
+        -j TPROXY \
+        -p udp \
+        --on-port "$tport" \
+        --tproxy-mark "$REROUTE_FW_MK" \
+ && "$iptables" -t mangle -A "$CHAIN" \
+        -j TPROXY \
+        -p tcp \
+        --on-port "$tport" \
+        --tproxy-mark "$REROUTE_FW_MK" \
+ && "$iptables" -t mangle -A PREROUTING \
+        -j "$CHAIN" \
+ && "$iptables" -n -t mangle --list "$CHAIN" \
+  ;
 }
 
-function setup_routing() {
-    (return 0) \
-     && ip rule add \
-            fwmark "$REROUTE_FW_MK" \
-            lookup "$RT_TABLE_NO" \
-     && ip route add \
-            local default \
-            dev lo \
-            table "$RT_TABLE_NO" \
-     && ip rule \
-     && ip route show table "$RT_TABLE_NO"
+teardown_iptables() {
+    local \
+        iptables="$(iptables_command $1)" \
+        ;
+
+  : \
+ && ( \
+        (   "$iptables" \
+                --table mangle \
+                -C PREROUTING \
+                -j "$CHAIN" \
+         && "$iptables" \
+                --table mangle \
+                -D PREROUTING \
+                -j "$CHAIN" \
+        ) \
+     || return 0 \
+    ) \
+ && (   [ -z "$( "$iptables" \
+                    --numeric \
+                    --table mangle \
+                    --list "$CHAIN" \
+                    2>/dev/null \
+                )" ] \
+     || (   "$iptables" \
+                --table mangle \
+                --flush "$CHAIN" \
+         && "$iptables" \
+                --table mangle \
+                --delete-chain "$CHAIN" \
+        ) \
+    ) \
+  ;
 }
+
 # Rule
-# All packages marked REROUTE_FW_MK by firewall
-# lookup table RT_TABLE_NO.
+# All traffic marked `REROUTE_FW_MK` by firewall
+# lookup table `RT_TABLE_NO`.
 #
 # Table
-# All packages lookup table RT_TABLE_NO, by default,
+# All traffic lookup table `RT_TABLE_NO`, by default,
 # get re-routed to device local.
-# If not re-routed, the packages cannot be received by Ray.
-
-function main() {
-    (return 0) \
-      && setup_iptables '4' \
-      && setup_iptables '6' \
-      && setup_routing \
-      && socat TCP-LISTEN:${RAY_PORT} STDOUT \
-       ;
-      #&& run_xray \
+# If not re-routed,
+# the packets won't be received by Process.
+#
+setup_routing() {
+ : \
+ && ip rule add \
+        fwmark "$REROUTE_FW_MK" \
+        lookup "$RT_TABLE_NO" \
+ && ip route add \
+        local default \
+        dev lo \
+        table "$RT_TABLE_NO" \
+ && ip rule \
+ && ip route show table "$RT_TABLE_NO" \
+  ;
 }
 
-function refresh_iptables() {
-    (return 0) \
-      && teardown_iptables "$1" \
-      && setup_iptables "$1" \
-       ;
+convert_config() {
+    local \
+        etc='/etc/can' \
+        cfg='/tmp/ray/config' \
+        ;
+  : \
+ && mkdir -p "$cfg" \
+ && find "${etc}/raycan" \
+        -type f \( -iname \*.yaml -o -iname \*.yml \) \
+        -exec sh -c \
+            "yq -o=json eval \$0 > \"${cfg}/\$( basename \$0 | cut -d. -f1 ).json\"" {} \; \
+ && ls "$cfg" \
+  ;
 }
 
-run() {
-    #socat TCP-LISTEN:${RAY_PORT} STDOUT \
-    socat -d -d tcp4-listen:${RAY_PORT},ip-transparent STDOUT
+run_xray() {
+    local \
+        cfg='/tmp/ray/config' \
+        ;
+    xray \
+        -confdir "$cfg" \
+    ;
+}
+
+main() {
+  : \
+ && setup_iptables '4' "$PORT" \
+ && setup_iptables '6' "$PORT" \
+ && setup_routing \
+ && convert_config \
+ && run_xray \
+  ;
 }
 
 if ((0 < $#))

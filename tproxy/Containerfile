@@ -1,17 +1,19 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
+# TODO:
+# * drop unzip
+# * drop findutils
+
 ARG PODTMP="/tmp/pod"
 
-RUN echo \
- && microdnf \
-        --assumeyes \
-        --refresh install \
-        iptables iproute iputils unzip findutils \
- && microdnf \
-        clean all \
- && mkdir -p "$PODTMP" \
-# Function to retrieve download URL.
+RUN : \
+ && microdnf --assumeyes --refresh install \
+        iptables \
+        iproute \
+        unzip \
+        findutils \
+ && microdnf clean all \
  && github_url() { \
         curl --location "https://api.github.com/repos/${1}/releases/tags/${2}" \
         | grep "browser_download_url" \
@@ -26,16 +28,17 @@ RUN echo \
         && curl --location "$url" --output "$3" \
          ; \
     } \
+ && mkdir -p "$PODTMP" \
  && github_download "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
  && github_download "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
   ;
 
 COPY \
-    "./default.yml" \
+    "./default.yaml" \
     "./entrypoint.sh" \
-    "${PODTMP}"
+    "$PODTMP"
 
-RUN echo \
+RUN : \
 # Install XRay.
  && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
  && chmod +x "${PODTMP}/xray/xray" \
@@ -46,15 +49,14 @@ RUN echo \
         "${PODTMP}/xray/geoip.dat"  \
  && rm "${PODTMP}/xray.zip" \
  && rm -r "${PODTMP}/xray" \
+# XRay Default Config
+ && mkdir -p "/etc/can/raycan" \
+ && mv \
+        "${PODTMP}/default.yaml" \
+        "/etc/can/raycan/" \
 # Install yq.
  && chmod +x "${PODTMP}/yq" \
  && mv "${PODTMP}/yq" "/usr/local/bin/yq" \
-# XRay Default Config
- && mkdir -p "/etc/xray" \
- && yq -o=json eval "${PODTMP}/default.yml" > "/etc/xray/default.json" \
- && rm "${PODTMP}/default.yml" \
- && mkdir -p "/etc/xray/ext" \
- && mkdir -p "/var/log/xray" \
 # Entrypoint
  && chmod +x "${PODTMP}/entrypoint.sh" \
  && mv "${PODTMP}/entrypoint.sh" "/usr/local/bin/entrypoint" \
