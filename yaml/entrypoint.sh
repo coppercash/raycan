@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -ux
+set -u
 
 convert_config() {
     local \
