@@ -1,9 +1,10 @@
-FROM docker.io/debian:bookworm-slim
+# TODO:
+# V drop unzip
+# * drop findutils
+
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
-# TODO:
-# * drop unzip
-# * drop findutils
+FROM docker.io/debian:bookworm-slim as build
 
 ARG PODTMP="/tmp/pod"
 
@@ -11,14 +12,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN : \
  && apt-get update \
  && apt-get install -y \
-        iptables \
-        iproute2 \
         unzip \
-        findutils \
-        isc-dhcp-client \
         curl \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* \
   ;
 RUN : \
  && github_url() { \
@@ -43,6 +38,33 @@ RUN : \
 COPY \
     "./default.yaml" \
     "./entrypoint.sh" \
+    "$PODTMP"
+
+FROM docker.io/debian:bookworm-slim
+
+ARG PODTMP="/tmp/pod"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN : \
+ && apt-get update \
+ && apt-get install -y \
+        iptables \
+        iproute2 \
+        unzip \
+        findutils \
+        isc-dhcp-client \
+        curl \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p "$PODTMP" \
+  ;
+
+COPY --from=build \
+    "${PODTMP}/default.yaml" \
+    "${PODTMP}/entrypoint.sh" \
+    "${PODTMP}/xray.zip" \
+    "${PODTMP}/yq" \
     "$PODTMP"
 
 RUN : \
