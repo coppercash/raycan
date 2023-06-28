@@ -1,6 +1,6 @@
 # TODO:
 # V drop unzip
-# * drop findutils
+# V drop findutils
 
 LABEL maintainer="Will <coderdreamer@gmail.com>"
 
@@ -34,6 +34,9 @@ RUN : \
  && github_download "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
  && github_download "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
   ;
+RUN : \
+ && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
+  ;
 
 COPY \
     "./default.yaml" \
@@ -51,10 +54,10 @@ RUN : \
  && apt-get install -y \
         iptables \
         iproute2 \
-        unzip \
-        findutils \
         isc-dhcp-client \
-        curl \
+        inadyn \
+        ca-certificates \
+        # required by inadyn
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p "$PODTMP" \
@@ -63,21 +66,18 @@ RUN : \
 COPY --from=build \
     "${PODTMP}/default.yaml" \
     "${PODTMP}/entrypoint.sh" \
-    "${PODTMP}/xray.zip" \
+    "${PODTMP}/xray" \
     "${PODTMP}/yq" \
     "$PODTMP"
 
 RUN : \
 # Install XRay.
- && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
- && chmod +x "${PODTMP}/xray/xray" \
- && mv "${PODTMP}/xray/xray" "/usr/local/bin/xray" \
+ && chmod +x "${PODTMP}/xray" \
+ && mv "${PODTMP}/xray" "/usr/local/bin/xray" \
  && mkdir -p "/usr/local/share/xray" \
  && mv -t "/usr/local/share/xray" \
-        "${PODTMP}/xray/geosite.dat" \
-        "${PODTMP}/xray/geoip.dat"  \
- && rm "${PODTMP}/xray.zip" \
- && rm -r "${PODTMP}/xray" \
+        "${PODTMP}/geosite.dat" \
+        "${PODTMP}/geoip.dat"  \
 # XRay Default Config
  && mkdir -p "/etc/can/raycan" \
  && mv \
@@ -90,7 +90,10 @@ RUN : \
  && chmod +x "${PODTMP}/entrypoint.sh" \
  && mv "${PODTMP}/entrypoint.sh" "/usr/local/bin/entrypoint" \
 # Clean up.
- && rm -r "$PODTMP" \
+ && rm -rf /var/lib/dhcp \
+ && rm -rf /var/log/inadyn \
+ && rm -rf /var/cache/inadyn \
+ && rm -rf "$PODTMP" \
   ;
 
 ENTRYPOINT ["entrypoint"]
