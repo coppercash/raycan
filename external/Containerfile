@@ -39,7 +39,6 @@ RUN : \
   ;
 
 COPY \
-    "./default.yaml" \
     "./entrypoint.sh" \
     "$PODTMP"
 
@@ -52,7 +51,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN : \
  && apt-get update \
  && apt-get install -y \
-        iptables \
         iproute2 \
         isc-dhcp-client \
         inadyn \
@@ -64,7 +62,6 @@ RUN : \
   ;
 
 COPY --from=build \
-    "${PODTMP}/default.yaml" \
     "${PODTMP}/entrypoint.sh" \
     "${PODTMP}/xray" \
     "${PODTMP}/yq" \
@@ -78,11 +75,6 @@ RUN : \
  && mv -t "/usr/local/share/xray" \
         "${PODTMP}/geosite.dat" \
         "${PODTMP}/geoip.dat"  \
-# XRay Default Config
- && mkdir -p "/etc/can/raycan" \
- && mv \
-        "${PODTMP}/default.yaml" \
-        "/etc/can/raycan/" \
 # Install yq.
  && chmod +x "${PODTMP}/yq" \
  && mv "${PODTMP}/yq" "/usr/local/bin/yq" \
