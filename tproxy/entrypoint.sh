@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -ux
+set -u
 
 # Clients: The hosts or containers use TProxy as gateway.
 # TProxy: This container.
@@ -154,10 +154,13 @@ convert_config() {
 run_xray() {
     local \
         cfg='/tmp/ray/config' \
+        log='/var/can/raycan/log' \
         ;
-    xray \
+  : \
+ && mkdir -p "$log" \
+ && xray \
         -confdir "$cfg" \
-    ;
+  ;
 }
 
 main() {
