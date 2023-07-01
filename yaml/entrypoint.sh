@@ -20,10 +20,13 @@ convert_config() {
 run_xray() {
     local \
         cfg='/tmp/ray/config' \
+        log='/var/can/raycan/log' \
         ;
-    xray \
+  : \
+ && mkdir -p "$log" \
+ && xray \
         -confdir "$cfg" \
-    ;
+  ;
 }
 
 
