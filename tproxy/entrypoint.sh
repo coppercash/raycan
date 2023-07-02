@@ -138,15 +138,13 @@ setup_routing() {
 
 convert_config() {
     local \
-        etc='/etc/can' \
+        etc='/etc/can/raycan' \
         cfg='/tmp/ray/config' \
         ;
   : \
  && mkdir -p "$cfg" \
- && find "${etc}/raycan" \
-        -type f \( -iname \*.yaml -o -iname \*.yml \) \
-        -exec sh -c \
-            "yq -o=json eval \$0 > \"${cfg}/\$( basename \$0 | cut -d. -f1 ).json\"" {} \; \
+ && sh -c "ls -1 ${etc}/*.yaml" \
+        | xargs -I {} sh -c "yq -o=json eval \$0 > \"${cfg}/\$(basename \$0 .yaml).json\"" {} \
  && ls "$cfg" \
   ;
 }
