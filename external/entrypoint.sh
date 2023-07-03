@@ -11,6 +11,7 @@ convert_config() {
  && mkdir -p "$cfg" \
  && sh -c "ls -1 ${etc}/*.yaml" \
         | xargs -I {} sh -c "yq -o=json eval \$0 > \"${cfg}/\$(basename \$0 .yaml).json\"" {} \
+ && ls "$cfg" \
   ;
 }
 
