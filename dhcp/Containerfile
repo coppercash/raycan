@@ -1,0 +1,85 @@
+LABEL maintainer="Will <coderdreamer@gmail.com>"
+
+FROM docker.io/debian:bookworm-slim as build
+
+ARG PODTMP="/tmp/pod"
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN : \
+ && apt-get update \
+ && apt-get install -y \
+        unzip \
+        curl \
+  ;
+RUN : \
+ && github_url() { \
+        curl --location "https://api.github.com/repos/${1}/releases/tags/${2}" \
+        | grep "browser_download_url" \
+        | grep "$3" \
+        | head -n 1 \
+        | cut -d '"' -f 4 \
+        ; \
+    } \
+ && github_download() { \
+        url=$(github_url "$1" "$2" "$4") \
+        && echo "Downloading ${1}@${2} (arch ${4}) from ${url} ..." \
+        && curl --location "$url" --output "$3" \
+         ; \
+    } \
+ && mkdir -p "$PODTMP" \
+ && github_download "mikefarah/yq" "v4.33.2" "${PODTMP}/yq" "linux_amd64" \
+ && github_download "xtls/xray-core" "v1.7.5" "${PODTMP}/xray.zip" "linux-64" \
+  ;
+RUN : \
+ && unzip "${PODTMP}/xray.zip" -d "${PODTMP}/xray" \
+  ;
+
+COPY \
+    "./entrypoint.sh" \
+    "$PODTMP"
+
+FROM docker.io/debian:bookworm-slim
+
+ARG PODTMP="/tmp/pod"
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN : \
+ && apt-get update \
+ && apt-get install -y \
+        iproute2 \
+        isc-dhcp-client \
+        ca-certificates \
+        # required by xray.xtls
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p "$PODTMP" \
+  ;
+
+COPY --from=build \
+    "${PODTMP}/entrypoint.sh" \
+    "${PODTMP}/xray" \
+    "${PODTMP}/yq" \
+    "$PODTMP"
+
+RUN : \
+# Install XRay.
+ && chmod +x "${PODTMP}/xray" \
+ && mv "${PODTMP}/xray" "/usr/local/bin/xray" \
+ && mkdir -p "/usr/local/share/xray" \
+ && mv -t "/usr/local/share/xray" \
+        "${PODTMP}/geosite.dat" \
+        "${PODTMP}/geoip.dat"  \
+# Install yq.
+ && chmod +x "${PODTMP}/yq" \
+ && mv "${PODTMP}/yq" "/usr/local/bin/yq" \
+# Entrypoint
+ && chmod +x "${PODTMP}/entrypoint.sh" \
+ && mv "${PODTMP}/entrypoint.sh" "/usr/local/bin/entrypoint" \
+# Clean up.
+ && rm -rf /var/lib/dhcp \
+ && rm -rf /var/log/inadyn \
+ && rm -rf /var/cache/inadyn \
+ && rm -rf "$PODTMP" \
+  ;
+
+ENTRYPOINT ["entrypoint"]
