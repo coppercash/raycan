@@ -125,7 +125,7 @@ function run_xray() {
         -exec sh -c \
             'yq -o=json eval $0 > `basename $0 | cut -d. -f1`.json' {} \; \
  && cd ~ \
- && xray \
+ && exec xray \
         -config "${XRAY_CFG_DIR}/default.json" \
         -confdir "$XRAY_EXT_CFG_DIR" \
   ;

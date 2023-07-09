@@ -156,7 +156,7 @@ run_xray() {
         ;
   : \
  && mkdir -p "$log" \
- && xray \
+ && exec xray \
         -confdir "$cfg" \
   ;
 }

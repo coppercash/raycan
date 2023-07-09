@@ -20,7 +20,7 @@ run_xray() {
         cfg='/tmp/ray/config' \
         ;
   : \
- && xray \
+ && exec xray \
         -confdir "$cfg" \
   ;
 }
