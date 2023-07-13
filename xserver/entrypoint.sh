@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -u
+set -ux
 
 etc_dir() {
     echo '/etc/can'
@@ -54,10 +54,10 @@ make_website() {
     local \
         repo='Metroxe/one-html-page-challenge' \
         version='070f33d8a5073560e3f377c9594a15162072881b' \
-        path='entries/ping-pong.html'
+        path='entries/ping-pong.html' \
         ;
     local \
-        source="https://raw.githubusercontent.com/${repo}/${ver}/${path}" \
+        source="https://raw.githubusercontent.com/${repo}/${version}/${path}" \
         ;
 
     if [ -f "$(html_home_dir)/index.html" ]
@@ -66,7 +66,7 @@ make_website() {
     fi
 
   : \
- && mkdir -p "$home" \
+ && mkdir -p "$(html_home_dir)" \
  && wget \
         "$source" \
         -O "$(html_home_dir)/index.html" \
@@ -113,19 +113,23 @@ acmesh_test() {
         --home "$(acmesh_home_dir)" \
         --config-home "$(acmesh_cfg_dir)" \
         --test \
-        --debug 3 \
         --log "${log_dir}/test.log" \
  && rm -rf "${crt_dir}/*" \
   ;
 }
 
 acmesh_register() {
+    local \
+        log_dir="$(acmesh_log_dir)" \
+        ;
   : \
  && mkdir -p "$log_dir" \
  && acme.sh --register-account \
         -m "$(email)" \
         --server zerossl \
         --config-home "$(acmesh_cfg_dir)" \
+        --debug 3 \
+        --log "${log_dir}/test.log" \
   ;
 }
 
@@ -199,6 +203,14 @@ ray_run() {
   ;
 }
 
+test() {
+  : \
+ && make_website \
+ && nginx_run \
+ && acmesh_test \
+  ;
+}
+
 main() {
   : \
  && make_website \
@@ -211,7 +223,4 @@ main() {
   ;
 }
 
-if ((0 < $#))
-then ${@:1}
-else main
-fi
+test

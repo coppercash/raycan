@@ -79,7 +79,7 @@ RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
         --cert-home "$ACME_CRT_DIR" \
  && cd / \
  && rm -rf "${PODTMP}/acme.sh-3.0.5" \
- && echo $'#!/bin/bash\n/usr/local/bin/acmesh/acme.sh "$@"' > "$ACME_EXE" \
+ && echo $'#!/usr/bin/env sh\n/usr/local/bin/acmesh/acme.sh "$@"' > "$ACME_EXE" \
  && chmod +x "$ACME_EXE" \
 
 # clean up
