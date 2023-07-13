@@ -15,7 +15,6 @@ RUN apk add --update --no-cache \
         # Needed by acme.sh
         # wget doen't work for acme.sh, but curl does.
         # Guessing it is a bug.
-        wireguard-tools \
 
  && mkdir "$PODTMP" \
  && wget \
@@ -42,7 +41,6 @@ RUN apk add --update --no-cache \
   ;
 
 COPY \
-    "./config/default.yml" \
     "./config/entrypoint.sh" \
     "$PODTMP"
 
@@ -72,10 +70,6 @@ RUN mv "${PODTMP}/entrypoint.sh" "$ENTRYPOINT_FILE" \
  && chmod +x "$XRAY_FILE" \
  && rm "${PODTMP}/xray.zip" \
  && rm -r "${PODTMP}/xray" \
-# XRay Default Config
- && mkdir -p "$XRAY_CFG_DIR" \
- && yq -o=json eval "${PODTMP}/default.yml" > "${XRAY_CFG_DIR}/default.json" \
- && rm "${PODTMP}/default.yml" \
 # acmesh
  && tar -zxf "${PODTMP}/acme.sh.tar.gz" --directory "${PODTMP}" \
  && cd "${PODTMP}/acme.sh-3.0.5" \
