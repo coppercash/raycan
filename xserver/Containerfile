@@ -41,7 +41,7 @@ RUN apk add --update --no-cache \
   ;
 
 COPY \
-    "./config/entrypoint.sh" \
+    "./entrypoint.sh" \
     "$PODTMP"
 
 ARG YQ_FILE="/usr/local/bin/yq"
