@@ -211,4 +211,7 @@ main() {
   ;
 }
 
-main
+if ((0 < $#))
+then ${@:1}
+else main
+fi
